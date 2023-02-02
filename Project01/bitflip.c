@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 // Help function tells user the correct usage
 void help() {
     printf("Usage: ./bitflip File [-o OutputFile] [-maxsize MaxSize] [-bfr] [-r]\n");
     printf("\tFile: Required, the file to take in as the input\n");
     printf("\t-o: Optional, an override of the output file name\n");
-    printf("\t-maxsize: Optional, an override of the maximum file size allowed for input\n");
+    printf("\t-maxsize: Optional, an override in kB of the maximum file size allowed (integer > 0)\n");
     printf("\t-bfr: Optional, reverse the order of the bytes and bit-flip the bits in the file\n");
     printf("\t-r: Optional, reverse the order of the bytes in the file without bit-flipping\n");
 }
@@ -52,6 +53,16 @@ int main(int argc, char *argv[]) {
         else if (strcmp(argv[i], "-maxsize") == 0) {
             if (i+1 < argc) {
                 max_size = atoi(argv[i+1]);
+
+                // Use strtol to check if the conversion to integer is valid
+                char *endptr;
+                long value = strtol(argv[i+1], &endptr, 10);
+
+                // If the conversion stopped, or if max_size invalid, print error and exit
+                if (*endptr != '\0'|| max_size <= 0) {
+                    printf("Error: Max size must between an integer greater than 0\n");
+                    exit(1);
+                }
             } 
             else {
                 printf("Error: missing size\n");
@@ -109,6 +120,9 @@ int main(int argc, char *argv[]) {
         printf("Error: Cannot use -r and -bfr together\n");
         exit(1);
     }
+
+    // Create a copy of the initial file name
+    char *initial_name = strdup(file_name);
 
     // If no output file name was provided, create one based off -bfr / -r flags or lack thereof
     if (!output_file_name) {
@@ -183,8 +197,12 @@ int main(int argc, char *argv[]) {
     rewind(fp);
     bytes = fwrite(buffer, 1, size, ofp);
 
-    // Close files and return
+    printf("Input: %s was %ld bytes\n", initial_name, size);
+    printf("Output: %s was output successfully\n", output_file_name);
+
+    // Close files, free memory, and return
     fclose(fp);
     fclose(ofp);
+    free(initial_name);
     return 0;
 }
