@@ -14,21 +14,7 @@ Starting code for CSE 30341 Project 3 - Spring 2023
 #include "bitmap.h"
 #include "fractal.h"
 
-/*
-Compute the number of iterations at point x, y
-in the complex space, up to a maximum of maxiter.
-Return the number of iterations at that point.
-
-This example computes the Mandelbrot fractal:
-z = z^2 + alpha
-
-Where z is initially zero, and alpha is the location x + iy
-in the complex plane.  Note that we are using the "complex"
-numeric type in C, which has the special functions cabs()
-and cpow() to compute the absolute values and powers of
-complex values.
-*/
-
+// Function to print out command line arguments
 void print_help() {
     printf("Help Information:\n");
     printf("-help         Display the help information\n");
@@ -43,8 +29,23 @@ void print_help() {
     printf("-threads N    Number of threads to use for processing (default is 1)\n");
     printf("-row          Run using a row-based approach\n");
     printf("-task         Run using a thread-based approach\n");
+    exit(-1);
 }
 
+/*
+Compute the number of iterations at point x, y
+in the complex space, up to a maximum of maxiter.
+Return the number of iterations at that point.
+
+This example computes the Mandelbrot fractal:
+z = z^2 + alpha
+
+Where z is initially zero, and alpha is the location x + iy
+in the complex plane.  Note that we are using the "complex"
+numeric type in C, which has the special functions cabs()
+and cpow() to compute the absolute values and powers of
+complex values.
+*/
 
 static int compute_point( double x, double y, int max )
 {
@@ -96,7 +97,7 @@ void compute_image_singlethread ( struct FractalSettings * pSettings, struct bit
 	}
 }
 
-// For Row Mode
+// New function based off compute_image_singlethread for row mode
 
 void *compute_image_thread_row(void *args)
 {
@@ -120,14 +121,18 @@ void *compute_image_thread_row(void *args)
     pthread_exit(NULL);
 }
 
+// Function used for row mode using multiple threads
 void compute_image_multiplethread_row(struct FractalSettings *pSettings, struct bitmap *pBitmap)
 {
+    // Initialize specified # of threads
     pthread_t threads[pSettings->nThreads];
     int thread_args[pSettings->nThreads];
     int i, rc;
 
+    // Calculate rows per thread
     int rows_per_thread = pSettings->nPixelHeight / pSettings->nThreads;
 
+    // Save attributes into new struct and create threads
     for (i = 0; i < pSettings->nThreads; i++) {
         struct thread_args *targs = malloc(sizeof(struct thread_args));
         targs->start = i * rows_per_thread;
@@ -141,6 +146,7 @@ void compute_image_multiplethread_row(struct FractalSettings *pSettings, struct 
         }
     }
 
+    // Join the threads
     for (i = 0; i < pSettings->nThreads; i++) {
         rc = pthread_join(threads[i], NULL);
         if (rc) {
@@ -150,13 +156,15 @@ void compute_image_multiplethread_row(struct FractalSettings *pSettings, struct 
     }
 }
 
-// For Task Mode
-
+// New function based off compute_image_singlethread for task mode
 void *compute_image_thread_task(void *args) {
+
+    // Create new struct to save attributes
     struct thread_args *targs = (struct thread_args *)args;
     struct task *task;
     int i, j;
 
+    // Make sure to protect critical data in look using locks
     while (1) {
         // Check if there are any remaining tasks
         pthread_mutex_lock(targs->pMutex);
@@ -194,9 +202,15 @@ void *compute_image_thread_task(void *args) {
 }
 
 void compute_image_multitask(struct FractalSettings *pSettings, struct bitmap *pBitmap) {
+    
+    // Initialize specified # of threads
     pthread_t threads[pSettings->nThreads];
     pthread_mutex_t mutex;
+
+    // Variable to store # of remaining tasks based off height
     int n_tasks_remaining = pSettings->nPixelHeight;
+
+    // Create new task array
     struct task **tasks = malloc(pSettings->nPixelHeight * sizeof(struct task *));
     int i, rc;
 
@@ -225,6 +239,7 @@ void compute_image_multitask(struct FractalSettings *pSettings, struct bitmap *p
         }
     }
 
+    // Join threads
     for (i = 0; i < pSettings->nThreads; i++) {
         rc = pthread_join(threads[i], NULL);
         if (rc) {
@@ -241,35 +256,41 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
 {
     /* If we don't process anything, it must be successful, right? */
 
+    // Initialize variables for processing input
     int i;
     double d;
     char *endptr;
     const char *arg;
     const char *argval;
 
+    // Loop through all args
     for (i = 1; i < argc; i++) {
         arg = argv[i];
 
+        // If -help entered, print out help message
         if (strcmp(arg, "-help") == 0) {
             print_help();
-            exit(EXIT_SUCCESS);
         } 
         
+        // For the rest of the arguments, make sure the input is valid, save to struct
+        // If invalid, return 0, else return 1
+
+        // For -xmin, -xmax, -ymin, etc. , use strtod to convert arg to float
+
         else if (strcmp(arg, "-xmin") == 0) {
             argval = argv[++i];
             d = strtod(argval, &endptr);
 
             if (*endptr != '\0') {
                 printf("Invalid value for -xmin: %s\n", argval);
-                exit(EXIT_FAILURE);
+                return 0;
             }
 
             if (d > pSettings->fMaxX) {
                 printf("-xmin cannot be greater than -xmax\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
             pSettings->fMinX = d;
-
         } 
         
         else if (strcmp(arg, "-xmax") == 0) {
@@ -277,11 +298,11 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
             d = strtod(argval, &endptr);
             if (*endptr != '\0') {
                 printf("Invalid value for -xmax: %s\n", argval);
-                exit(EXIT_FAILURE);
+                return 0;
             }
             if (d < pSettings->fMinX) {
                 printf("-xmax cannot be less than -xmin\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
             pSettings->fMaxX = d;
         } 
@@ -291,11 +312,11 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
             d = strtod(argval, &endptr);
             if (*endptr != '\0') {
                 printf("Invalid value for -ymin: %s\n", argval);
-                exit(EXIT_FAILURE);
+                return 0;
             }
             if (d > pSettings->fMaxY) {
                 printf("-ymin cannot be greater than -ymax\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
             pSettings->fMinY = d;
         } 
@@ -305,11 +326,11 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
             d = strtod(argval, &endptr);
             if (*endptr != '\0') {
                 printf("Invalid value for -ymax: %s\n", argval);
-                exit(EXIT_FAILURE);
+                return 0;
             }
             if (d < pSettings->fMinY) {
                 printf("-ymax cannot be less than -ymin\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
             pSettings->fMaxY = d;
 
@@ -322,7 +343,7 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
                 pSettings->nMaxIter = n;
             } else {
                 printf("Error: Invalid value for -maxiter argument\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
         } 
         
@@ -333,7 +354,7 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
                 pSettings->nPixelWidth = w;
             } else {
                 printf("Error: Invalid value for -width argument\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
         } 
         
@@ -344,7 +365,7 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
                 pSettings->nPixelHeight = h;
             } else {
                 printf("Error: Invalid value for -height argument\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
         } 
         
@@ -353,10 +374,9 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
             char* outfile = argv[i];
             if (strlen(outfile) <= MAX_OUTFILE_NAME_LEN) {
                 strcpy(pSettings->szOutfile, outfile);
-                printf("%s\n", pSettings->szOutfile);
             } else {
                 printf("Error: Output filename is too long\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
         } 
         
@@ -367,30 +387,39 @@ char processArguments (int argc, char * argv[], struct FractalSettings * pSettin
                 pSettings->nThreads = t;
             } else {
                 printf("Error: Invalid value for -threads argument\n");
-                exit(EXIT_FAILURE);
+                return 0;
             }
         } 
         
+        // For inputs -row and -task, ensure that both are not entered
+
         else if (strcmp(argv[i], "-row") == 0) {
+            if (pSettings->theMode != MODE_THREAD_SINGLE) {
+                printf("Error - Cannot Use Task and Row Mode\n");
+                return 0;
+
+            }
             pSettings->theMode = MODE_THREAD_ROW;
         } 
         
         else if (strcmp(argv[i], "-task") == 0) {
+            if (pSettings->theMode != MODE_THREAD_SINGLE) {
+                printf("Error - Cannot Use Task and Row Mode\n");
+                return 0;
+
+            }
             pSettings->theMode = MODE_THREAD_TASK;
         } 
         
+        // Print error if unsuccessful
         else {
             printf("Error: Invalid argument\n");
-            exit(EXIT_FAILURE);
+            return 0;
         }
     }
 
-
     return 1;
 }
-
-
-
 
 int main( int argc, char *argv[] )
 {
@@ -434,7 +463,6 @@ int main( int argc, char *argv[] )
 
 
    /* Are there any locks to set up? */
-
 
    if(processArguments(argc, argv, &theSettings))
    {
@@ -515,14 +543,13 @@ int main( int argc, char *argv[] )
         else 
         {
             /* Uh oh - how did we get here? */
-            // Not sure ???
+            printf("Error: Invalid Arguments\n");
+            exit(-1);
         }
    }
    else
    {
         /* Probably a great place to dump the help */
-
-        printf("Error: Invalid Arguments\n");
         print_help();
 
         /* Probably a good place to bail out */
