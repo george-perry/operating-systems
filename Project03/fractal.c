@@ -126,7 +126,7 @@ void compute_image_multiplethread_row(struct FractalSettings *pSettings, struct 
 {
     // Initialize specified # of threads
     pthread_t threads[pSettings->nThreads];
-    int thread_args[pSettings->nThreads];
+    // int thread_args[pSettings->nThreads];
     int i, rc;
 
     // Calculate rows per thread
