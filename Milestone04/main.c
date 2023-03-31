@@ -70,10 +70,15 @@ char stack_ts_cv_push (struct ByteBlock * pBlock)
     /* Condition variable version */
     /* Your code goes here! */
 
+    // While the stack is full, wait on the CV
+
     pthread_mutex_lock(&StackLock);
     while (StackSize >= STACK_MAX_SIZE) {
         pthread_cond_wait(&StackCV, &StackLock);
     }
+
+    // When signaled, add to stack and broadcast to CV_Pop
+
     StackItems[StackSize] = pBlock;
     StackSize++;
 
@@ -103,11 +108,15 @@ char stack_ts_push (struct ByteBlock * pBlock)
 
 struct ByteBlock * stack_ts_cv_pop ()
 {
+
+    // While stack is empty and iterations unfinished, wait on CV_Pop
     pthread_mutex_lock(&StackLock);
 
     while (StackSize == 0 && CountDone < CountExpected) {
         pthread_cond_wait(&StackCV_Pop, &StackLock);
     }
+
+    // If the stack isn't empty, remove item and signal to CV to push new
 
     if (StackSize > 0) {
 
@@ -243,7 +252,7 @@ void * thread_consumer (void * pData)
         {
             pthread_mutex_unlock(&DoneLock);
 
-            // Broadcast to thread waiting to pop 
+            // Broadcast to thread waiting to pop when done
             pthread_cond_broadcast(&StackCV_Pop);
             break;
         }
@@ -334,6 +343,8 @@ int main (int argc, char *argv[])
     nThreadsConsumers = atoi(argv[2]);
     nIterations = atoi(argv[3]);
 
+    // Ensure input is positive
+    
     if (nThreadsProducers <= 0 || nThreadsConsumers <= 0 || nIterations <= 0) {
         printf("Invalid input - values must be greater than 0\n");
         exit(1);
