@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-#ifndef __DS_CV_H
-#define __DS_CV_H
+#ifndef __QUEUE_H
+#define __QUEUE_H
 
 
 #include <pthread.h>
@@ -14,6 +14,8 @@ typedef struct {
     size_t front;
     size_t rear;
     size_t count;
+    char KeepGoing;
+    int total_packets;
     pthread_mutex_t lock;
     pthread_cond_t full;
     pthread_cond_t empty;

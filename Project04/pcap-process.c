@@ -79,31 +79,22 @@ void resetAndSaveEntry (int nEntry)
     BigTable[nEntry].ThePacket = NULL;
 }
 
-void* processPacket_wrapper(void *arg) {
+void* processPacket_consumer(void *arg) {
 
     Queue *queue = (Queue *) arg;
     struct Packet * pPacket;
+    int total = 0;
 
-    printf("TEST\n\n");
-    pthread_mutex_lock(&queue->lock);
+    while (1) {
 
-    // if (queue->count == 0) {
-    //     pthread_cond_wait(&queue->empty, &queue->lock);
-    // }
+        pPacket = dequeue(queue);
+        processPacket(pPacket);
+        total++;
 
-
-    while(queue->count > 0)
-    {
-        pthread_cond_wait(&queue->empty, &queue->lock);
+        if (total == queue->total_packets) {
+            break;
+        }
     }
-
-    pPacket = dequeue(queue);
-
-
-    processPacket(pPacket);
-
-    pthread_mutex_unlock(&queue->lock);
-
 
     return NULL;
 }

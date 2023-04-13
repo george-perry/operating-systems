@@ -15,7 +15,7 @@
 #include "packet.h"
 #include "pcap-read.h"
 #include "pcap-process.h"
-#include "ds_cv.h"
+#include "queue.h"
 
 #define SHOW_DEBUG	1
 
@@ -173,7 +173,7 @@ struct Packet * readNextPacket (FILE * pTheFile, struct FilePcapInfo * pFileInfo
 }
 
 // Wrapper used by thread to call readPcapFile
-void* read_pcap_wrapper(void* args) {
+void* readPcapFile_producer(void* args) {
 
 	// 
     readPcapFile(args);
@@ -189,10 +189,11 @@ char readPcapFile (void* arg)
     struct FilePcapInfo* pFileInfo = &(thread_args->theInfo);
     Queue* packet_queue = thread_args->packet_queue;
 
+	/* Open the file and its respective front matter */
     FILE* pTheFile = fopen(pFileInfo->FileName, "r");
-	// printf("%d\n\n\n", pFileInfo->MaxPackets);
 
 	struct Packet * pPacket;
+	int total = 0;
 
 	/* Default is to not flip due to endian-ness issues */
 	pFileInfo->EndianFlip = 0;
@@ -201,8 +202,6 @@ char readPcapFile (void* arg)
 	pFileInfo->Packets = 0;
 	pFileInfo->BytesRead = 0;
 
-	/* Open the file and its respective front matter */
-	// pTheFile = fopen(pFileInfo->FileName, "r");
 
 	/* Read the front matter */
 	if(!parsePcapFileStart(pTheFile, pFileInfo))
@@ -215,13 +214,14 @@ char readPcapFile (void* arg)
 	{		
 		pPacket = readNextPacket(pTheFile, pFileInfo);
 		enqueue(packet_queue, pPacket);
+		total++;
 
 		printf("COUNT: %d\n", packet_queue->count);
 
-		if(pPacket != NULL)
-		{
-			// processPacket(pPacket);
-		}
+		// if(pPacket != NULL)
+		// {
+		// 	// processPacket(pPacket);
+		// }
 
 		/* Allow for an early bail out if specified */
 		if(pFileInfo->MaxPackets != 0)
@@ -236,6 +236,12 @@ char readPcapFile (void* arg)
 	fclose(pTheFile);
 
 	printf("File processing complete - %s file read containing %d packets with %d bytes of packet data\n", pFileInfo->FileName, pFileInfo->Packets, pFileInfo->BytesRead);
+	
+	packet_queue->total_packets = total;
+	packet_queue->KeepGoing = 0;
+
+	printf("%d\n", packet_queue->total_packets);
+	
 	return 1;
 }
 

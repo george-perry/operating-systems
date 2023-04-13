@@ -10,7 +10,7 @@ char * strdup(const char *s);
 
 #include "pcap-read.h"
 #include "pcap-process.h"
-#include "ds_cv.h"
+#include "queue.h"
 
 
 int main (int argc, char *argv[])
@@ -47,7 +47,7 @@ int main (int argc, char *argv[])
      */
 
 
-    Queue *packet_queue = createQueue(1024);
+    Queue *packet_queue = createQueue(5000);
     pthread_t reader_threads[argc - 1];
 
     for (int i = 1; i < argc; i++) {
@@ -64,14 +64,14 @@ int main (int argc, char *argv[])
         thread_args->theInfo = theInfo;
         thread_args->packet_queue = packet_queue;
 
-        pthread_create(&reader_threads[i - 1], NULL, read_pcap_wrapper, (void*) thread_args);
+        pthread_create(&reader_threads[i - 1], NULL, readPcapFile_producer, (void*) thread_args);
     }
 
 
     pthread_t consumer_thread[1];
 
     for (int i = 1; i < 3; i++) {
-        pthread_create(&consumer_thread[i-1], NULL, processPacket_wrapper, (void*) packet_queue);
+        pthread_create(&consumer_thread[i-1], NULL, processPacket_consumer, (void*) packet_queue);
     }
 
 

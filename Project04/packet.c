@@ -46,10 +46,10 @@ void discardPacket (struct Packet * pPacket)
     /* Free up the internal buffer */
     if(pPacket->Data != NULL)
     {
-        free(pPacket->Data);
+        // free(pPacket->Data);
         pPacket->SizeDataMax = 0;
     }
 
     /* Free up the actual struct itself */
-    free(pPacket);
+    // free(pPacket);
 }

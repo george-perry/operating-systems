@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "packet.h"
-#include "ds_cv.h"
+#include "queue.h"
 
 #define DEFAULT_TABLE_SIZE  512
 #define MIN_PKT_SIZE        128
@@ -41,7 +41,7 @@ extern int    BigTableSize;
 extern int    BigTableNextToReplace;
 
 char initializeProcessing (int TableSize);
-void* processPacket_wrapper(void *arg);
+void* processPacket_consumer(void *arg);
 void processPacket (struct Packet * pPacket);
 void tallyProcessing ();
 

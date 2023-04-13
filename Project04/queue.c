@@ -1,4 +1,4 @@
-#include "ds_cv.h"
+#include "queue.h"
 
 Queue *createQueue(size_t capacity) {
     Queue *q = (Queue *)malloc(sizeof(Queue));
@@ -7,6 +7,8 @@ Queue *createQueue(size_t capacity) {
     q->front = 0;
     q->rear = -1;
     q->count = 0;
+    q->KeepGoing = 1;
+    q->total_packets = 0;
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->full, NULL);
     pthread_cond_init(&q->empty, NULL);
@@ -30,7 +32,7 @@ int enqueue(Queue *q, struct Packet *packet) {
     q->buffer[q->rear] = *packet;
     q->count++;
     pthread_mutex_unlock(&q->lock);
-    pthread_cond_signal(&q->empty);
+    pthread_cond_broadcast(&q->empty);
     return 0;
 }
 

@@ -50,7 +50,7 @@ struct Packet * readNextPacket (FILE * pTheFile, struct FilePcapInfo * pFileInfo
 // char readPcapFile (struct FilePcapInfo * pFileInfo);
 
 char readPcapFile (void* arg);
-void* read_pcap_wrapper(void* args);
+void* readPcapFile_producer(void* args);
 
 #endif
 
