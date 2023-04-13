@@ -8,7 +8,7 @@ Queue *createQueue(size_t capacity) {
     q->rear = -1;
     q->count = 0;
     q->KeepGoing = 1;
-    q->total_packets = 0;
+    q->total_packets = 10000;
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->full, NULL);
     pthread_cond_init(&q->empty, NULL);
@@ -28,11 +28,13 @@ int enqueue(Queue *q, struct Packet *packet) {
     while (q->count == q->capacity) {
         pthread_cond_wait(&q->full, &q->lock);
     }
+    // printf("\nADD TO QUEUE\n");
+
     q->rear = (q->rear + 1) % q->capacity;
     q->buffer[q->rear] = *packet;
     q->count++;
+    pthread_cond_signal(&q->empty);
     pthread_mutex_unlock(&q->lock);
-    pthread_cond_broadcast(&q->empty);
     return 0;
 }
 
@@ -41,10 +43,12 @@ struct Packet *dequeue(Queue *q) {
     while (q->count == 0) {
         pthread_cond_wait(&q->empty, &q->lock);
     }
+    // printf("\nREMOVE FROM QUEUE\n");
+
     struct Packet *packet = &q->buffer[q->front];
     q->front = (q->front + 1) % q->capacity;
     q->count--;
-    pthread_mutex_unlock(&q->lock);
     pthread_cond_signal(&q->full);
+    pthread_mutex_unlock(&q->lock);
     return packet;
 }

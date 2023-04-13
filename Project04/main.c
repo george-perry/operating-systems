@@ -47,7 +47,7 @@ int main (int argc, char *argv[])
      */
 
 
-    Queue *packet_queue = createQueue(5000);
+    Queue *packet_queue = createQueue(1024);
     pthread_t reader_threads[argc - 1];
 
     for (int i = 1; i < argc; i++) {

@@ -38,18 +38,29 @@ struct Packet * allocatePacket (uint16_t DataSize)
     pPacket->PayloadOffset = 0;
     pPacket->PayloadSize = 0;
 
+    pPacket->isFreed = 0;
+
     return pPacket;
 }
 
 void discardPacket (struct Packet * pPacket)
 {
+
+    if (pPacket->isFreed == 0){
+        return;
+    }
+
     /* Free up the internal buffer */
     if(pPacket->Data != NULL)
     {
-        // free(pPacket->Data);
+        printf("OKOK\n\n");
+        free(pPacket->Data);
         pPacket->SizeDataMax = 0;
     }
 
     /* Free up the actual struct itself */
-    // free(pPacket);
+
+    free(pPacket);
+    pPacket->isFreed = 1;
+
 }

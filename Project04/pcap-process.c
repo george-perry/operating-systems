@@ -88,8 +88,14 @@ void* processPacket_consumer(void *arg) {
     while (1) {
 
         pPacket = dequeue(queue);
-        processPacket(pPacket);
-        total++;
+
+        if (pPacket != NULL) {
+
+            processPacket(pPacket);
+            total++;
+        }
+
+        // printf("\nCURR COUT: %d, %d\n", total, queue->total_packets);
 
         if (total == queue->total_packets) {
             break;
@@ -134,6 +140,7 @@ void processPacket (struct Packet * pPacket)
 
     if(pPacket->LengthIncluded <= MIN_PKT_SIZE)
     {
+        // printf("DISCARD ERROR HERE\n\n");
         discardPacket(pPacket);
         return;
     }

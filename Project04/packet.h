@@ -39,6 +39,8 @@ struct Packet
 
     /* Size of the payload */
     uint32_t    PayloadSize;
+
+    int isFreed;
 };
 
 /* Helper to do the endian magic fix */

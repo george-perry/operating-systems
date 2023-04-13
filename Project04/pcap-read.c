@@ -178,6 +178,17 @@ void* readPcapFile_producer(void* args) {
 	// 
     readPcapFile(args);
     readPcapFile(args);
+
+	// ThreadArgs* thread_args = (ThreadArgs*) args;
+
+
+	// Queue* packet_queue = thread_args->packet_queue;
+	// deleteQueue(packet_queue);
+
+    // Queue* pq = createQueue(10);
+	// thread_args->packet_queue = pq;
+
+    // readPcapFile(thread_args);
     return NULL;
 }
 
@@ -213,15 +224,15 @@ char readPcapFile (void* arg)
 	while(!feof(pTheFile))
 	{		
 		pPacket = readNextPacket(pTheFile, pFileInfo);
-		enqueue(packet_queue, pPacket);
-		total++;
 
-		printf("COUNT: %d\n", packet_queue->count);
+		if(pPacket != NULL)
+		{
+			// processPacket(pPacket);
+			enqueue(packet_queue, pPacket);
+			total++;
+			// printf("COUNT: %d\n", packet_queue->count);
 
-		// if(pPacket != NULL)
-		// {
-		// 	// processPacket(pPacket);
-		// }
+		}
 
 		/* Allow for an early bail out if specified */
 		if(pFileInfo->MaxPackets != 0)
@@ -240,7 +251,7 @@ char readPcapFile (void* arg)
 	packet_queue->total_packets = total;
 	packet_queue->KeepGoing = 0;
 
-	printf("%d\n", packet_queue->total_packets);
+	// printf("%d\n", packet_queue->total_packets);
 	
 	return 1;
 }
