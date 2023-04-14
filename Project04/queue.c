@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "pcap-process.h"
 
 Queue *createQueue(size_t capacity) {
     Queue *q = (Queue *)malloc(sizeof(Queue));
@@ -9,6 +10,7 @@ Queue *createQueue(size_t capacity) {
     q->count = 0;
     q->KeepGoing = 1;
     q->total_packets = 10000;
+    q->curr_total = 0;
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->full, NULL);
     pthread_cond_init(&q->empty, NULL);
@@ -24,31 +26,48 @@ void deleteQueue(Queue *q) {
 }
 
 int enqueue(Queue *q, struct Packet *packet) {
+
     pthread_mutex_lock(&q->lock);
     while (q->count == q->capacity) {
         pthread_cond_wait(&q->full, &q->lock);
     }
-    // printf("\nADD TO QUEUE\n");
 
     q->rear = (q->rear + 1) % q->capacity;
     q->buffer[q->rear] = *packet;
     q->count++;
+
     pthread_cond_signal(&q->empty);
     pthread_mutex_unlock(&q->lock);
     return 0;
 }
 
-struct Packet *dequeue(Queue *q) {
-    pthread_mutex_lock(&q->lock);
-    while (q->count == 0) {
-        pthread_cond_wait(&q->empty, &q->lock);
-    }
-    // printf("\nREMOVE FROM QUEUE\n");
+void *dequeue(void *arg) {
 
-    struct Packet *packet = &q->buffer[q->front];
-    q->front = (q->front + 1) % q->capacity;
-    q->count--;
-    pthread_cond_signal(&q->full);
-    pthread_mutex_unlock(&q->lock);
-    return packet;
+    Queue *q = (Queue *)arg;
+
+    while (q->KeepGoing || q->count > 0) {
+
+        pthread_mutex_lock(&q->lock);
+        while (q->count == 0 && q->KeepGoing) {
+            pthread_cond_wait(&q->empty, &q->lock);
+        }
+
+        if (q->count > 0) {
+            struct Packet *packet = &q->buffer[q->front];
+            q->front = (q->front + 1) % q->capacity;
+            q->count--;
+
+            pthread_cond_signal(&q->full);
+            pthread_mutex_unlock(&q->lock);
+
+            // Perform redundancy computation on packet here
+            processPacket(packet);
+
+        } else {
+            pthread_mutex_unlock(&q->lock);
+        }
+    }
+
+    return NULL;
+
 }

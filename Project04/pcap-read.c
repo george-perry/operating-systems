@@ -19,7 +19,6 @@
 
 #define SHOW_DEBUG	1
 
-
 char parsePcapFileStart (FILE * pTheFile, struct FilePcapInfo * pFileInfo)
 {
 	// tcpdump header processing
@@ -29,6 +28,19 @@ char parsePcapFileStart (FILE * pTheFile, struct FilePcapInfo * pFileInfo)
 	//
 	//  Also see:
 	//	 http://wiki.wireshark.org/Development/LibpcapFileFormat
+
+	if(pTheFile == NULL)
+	{
+		printf("* Error (parsePcapFileStart): FILE pointer was NULL\n");
+		return 0;
+	}
+
+	if(pFileInfo == NULL)
+	{
+		printf("* Error (parsePcapFileStart): F was NULL\n");
+		return 0;
+	}
+
 		
 	int					nMagicNum;
 	unsigned short		nMajor;
@@ -176,19 +188,22 @@ struct Packet * readNextPacket (FILE * pTheFile, struct FilePcapInfo * pFileInfo
 void* readPcapFile_producer(void* args) {
 
 	// 
+
+	ThreadArgs* thread_args = (ThreadArgs*) args;
+    Queue* packet_queue = thread_args->packet_queue;
+
     readPcapFile(args);
-    readPcapFile(args);
 
-	// ThreadArgs* thread_args = (ThreadArgs*) args;
+	if (thread_args->num_files == 1){
+	    readPcapFile(args);
+	}
 
+    pthread_mutex_lock(&packet_queue->lock);
+	packet_queue->KeepGoing = 0;
+	pthread_cond_broadcast(&packet_queue->empty);
 
-	// Queue* packet_queue = thread_args->packet_queue;
-	// deleteQueue(packet_queue);
+    pthread_mutex_unlock(&packet_queue->lock);
 
-    // Queue* pq = createQueue(10);
-	// thread_args->packet_queue = pq;
-
-    // readPcapFile(thread_args);
     return NULL;
 }
 
@@ -213,7 +228,6 @@ char readPcapFile (void* arg)
 	pFileInfo->Packets = 0;
 	pFileInfo->BytesRead = 0;
 
-
 	/* Read the front matter */
 	if(!parsePcapFileStart(pTheFile, pFileInfo))
 	{
@@ -227,11 +241,8 @@ char readPcapFile (void* arg)
 
 		if(pPacket != NULL)
 		{
-			// processPacket(pPacket);
 			enqueue(packet_queue, pPacket);
 			total++;
-			// printf("COUNT: %d\n", packet_queue->count);
-
 		}
 
 		/* Allow for an early bail out if specified */
@@ -249,12 +260,6 @@ char readPcapFile (void* arg)
 	printf("File processing complete - %s file read containing %d packets with %d bytes of packet data\n", pFileInfo->FileName, pFileInfo->Packets, pFileInfo->BytesRead);
 	
 	packet_queue->total_packets = total;
-	packet_queue->KeepGoing = 0;
 
-	// printf("%d\n", packet_queue->total_packets);
-	
 	return 1;
 }
-
-
-

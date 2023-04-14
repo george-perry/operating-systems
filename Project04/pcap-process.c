@@ -79,32 +79,6 @@ void resetAndSaveEntry (int nEntry)
     BigTable[nEntry].ThePacket = NULL;
 }
 
-void* processPacket_consumer(void *arg) {
-
-    Queue *queue = (Queue *) arg;
-    struct Packet * pPacket;
-    int total = 0;
-
-    while (1) {
-
-        pPacket = dequeue(queue);
-
-        if (pPacket != NULL) {
-
-            processPacket(pPacket);
-            total++;
-        }
-
-        // printf("\nCURR COUT: %d, %d\n", total, queue->total_packets);
-
-        if (total == queue->total_packets) {
-            break;
-        }
-    }
-
-    return NULL;
-}
-
 void processPacket (struct Packet * pPacket)
 {
     uint16_t        PayloadOffset;
@@ -140,7 +114,6 @@ void processPacket (struct Packet * pPacket)
 
     if(pPacket->LengthIncluded <= MIN_PKT_SIZE)
     {
-        // printf("DISCARD ERROR HERE\n\n");
         discardPacket(pPacket);
         return;
     }
