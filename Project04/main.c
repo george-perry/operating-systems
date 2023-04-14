@@ -197,6 +197,7 @@ int main (int argc, char *argv[])
     deleteQueue(packet_queue);
     free(reader_threads);
     free(consumer_thread);
+
     free(file_names);
 
     return 0;

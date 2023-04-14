@@ -1,9 +1,14 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <string.h>
+#include <stdint.h>
 
 #include "pcap-process.h"
+#include <openssl/sha.h>
+
+#define MAX_PACKET_SIZE 2000
+#define MAX_PACKETS 128000
 
 /* How many packets have we seen? */
 uint32_t        gPacketSeenCount;
@@ -18,71 +23,74 @@ uint32_t        gPacketHitCount;
 uint64_t        gPacketHitBytes;
 
 /* Our big table for recalling packets */
-struct PacketEntry *    BigTable; 
-int    BigTableSize;
-int    BigTableNextToReplace;
+struct PacketEntry* hashTable;
+int HashTableSize;
 
-
-
-void initializeProcessingStats ()
-{
-    gPacketSeenCount = 0;
-    gPacketSeenBytes = 0;        
-    gPacketHitCount  = 0;
-    gPacketHitBytes  = 0;    
-}
-
-char initializeProcessing (int TableSize)
-{
-    initializeProcessingStats();
-
-    /* Allocate our big table */
-    BigTable = (struct PacketEntry *) malloc(sizeof(struct PacketEntry) * TableSize);
-
-    if(BigTable == NULL)
-    {
-        printf("* Error: Unable to create the new table\n");
+char initializeProcessing(int tableSize) {
+    // Initialize hash table
+    HashTableSize = tableSize;
+    hashTable = (struct PacketEntry*) malloc(HashTableSize * sizeof(struct PacketEntry));
+    if (hashTable == NULL) {
         return 0;
     }
-
-    for(int j=0; j<TableSize; j++)
-    {
-        BigTable[j].ThePacket = NULL;
-        BigTable[j].HitCount  = 0;
-        BigTable[j].RedundantBytes = 0;
+    for (int i = 0; i < HashTableSize; i++) {
+        hashTable[i].ThePacket = NULL;
     }
-
-    BigTableSize = TableSize;
-    BigTableNextToReplace = 0;
+    // Initialize global counters
+    gPacketSeenCount = 0;
+    gPacketSeenBytes = 0;
+    gPacketHitCount = 0;
+    gPacketHitBytes = 0;
     return 1;
 }
 
+
+// Provided function - just changed var names for hashTable
 void resetAndSaveEntry (int nEntry)
 {
-    if(nEntry < 0 || nEntry >= BigTableSize)
+    if(nEntry < 0 || nEntry >= HashTableSize)
     {
         printf("* Warning: Tried to reset an entry in the table - entry out of bounds (%d)\n", nEntry);
         return;
     }
 
-    if(BigTable[nEntry].ThePacket == NULL)
+    if(hashTable[nEntry].ThePacket == NULL)
     {
         return;
     }
 
-    gPacketHitCount += BigTable[nEntry].HitCount;
-    gPacketHitBytes += BigTable[nEntry].RedundantBytes;
-    discardPacket(BigTable[nEntry].ThePacket);
+    gPacketHitCount += hashTable[nEntry].HitCount;
+    gPacketHitBytes += hashTable[nEntry].RedundantBytes;
+    discardPacket(hashTable[nEntry].ThePacket);
 
-    BigTable[nEntry].HitCount = 0;
-    BigTable[nEntry].RedundantBytes = 0;
-    BigTable[nEntry].ThePacket = NULL;
+    hashTable[nEntry].HitCount = 0;
+    hashTable[nEntry].RedundantBytes = 0;
+    hashTable[nEntry].ThePacket = NULL;
 }
 
-void processPacket (struct Packet * pPacket)
+uint64_t computeHash(uint8_t * data, size_t size)
 {
-    uint16_t        PayloadOffset;
+    // Use jenkins hash algorithm to compute the hash value
 
+    size_t i = 0;
+    uint64_t hash = 0;
+
+    while (i != size) {
+        hash += data[i++];
+        hash += hash << 10;
+        hash ^= hash >> 6;
+    }
+
+    hash += hash << 3;
+    hash ^= hash >> 11;
+    hash += hash << 15;
+    return hash;
+}
+
+void processPacket(struct Packet *pPacket)
+{
+
+    uint16_t        PayloadOffset;
     PayloadOffset = 0;
 
     /* Do a bit of error checking */
@@ -172,92 +180,47 @@ void processPacket (struct Packet * pPacket)
     printf("  processPacket -> Found an IP packet that is TCP or UDP\n");
 
     uint16_t    NetPayload;
-
     NetPayload = pPacket->LengthIncluded - PayloadOffset;
-
     pPacket->PayloadOffset = PayloadOffset;
     pPacket->PayloadSize = NetPayload;
 
-    /* Step 2: Do any packet payloads match up? */
+    // Compute the hash of the packet payload
+    
+    uint64_t hash = (uint64_t) computeHash((pPacket->Data + PayloadOffset), NetPayload);
 
-    int j;
+    // Look for an existing packet with the same hash
+    struct PacketEntry *entry = &hashTable[hash % HashTableSize];
 
-    for(j=0; j<BigTableSize; j++)
+    while (entry != NULL)
     {
-        if(BigTable[j].ThePacket != NULL)
+        if (entry->ThePacket != NULL && entry->ThePacket->PayloadSize == NetPayload && memcmp(entry->ThePacket->Data + PayloadOffset, pPacket->Data + PayloadOffset, NetPayload) == 0)
         {
-            int k;
+            // Whoot, whoot - the payloads match up
+            entry->HitCount++;
+            entry->RedundantBytes += pPacket->PayloadSize;
 
-            /* Are the sizes the same? */
-            if(BigTable[j].ThePacket->PayloadSize != pPacket->PayloadSize)
-            {
-                continue;
-            }
-
-            /* OK - same size - do the bytes match up? */
-            for(k=0; k<BigTable[j].ThePacket->PayloadSize; k++)
-            {
-                if(BigTable[j].ThePacket->Data[k+PayloadOffset] != pPacket->Data[k+PayloadOffset])
-                {
-                    /* Nope - they are not the same */
-                    break;
-                }
-            }
-
-            /* Did we break out with a mismatch? */
-            if(k < BigTable[j].ThePacket->PayloadSize)
-            {
-                continue;
-            }
-            else 
-            {
-                /* Whoot, whoot - the payloads match up */
-                BigTable[j].HitCount++;
-                BigTable[j].RedundantBytes += pPacket->PayloadSize;
-
-                /* The packets match so get rid of the matching one */
-                discardPacket(pPacket);
-                return;
-            }
+            // The packets match so get rid of the matching one
+            discardPacket(pPacket);
+            return;
         }
-        else 
-        {
-            /* We made it to an empty entry without a match */
-            
-            BigTable[j].ThePacket = pPacket;
-            BigTable[j].HitCount = 0;
-            BigTable[j].RedundantBytes = 0;
-            break;
-        }
+
+        entry = entry->Next;
     }
 
-    /* Did we search the entire table and find no matches? */
-    if(j == BigTableSize)
-    {
-        /* Kick out the "oldest" entry by saving its entry to the global counters and 
-           free up that packet allocation 
-         */
-        resetAndSaveEntry(BigTableNextToReplace);
-
-        /* Take ownership of the packet */
-        BigTable[BigTableNextToReplace].ThePacket = pPacket;
-
-        /* Rotate to the next one to replace */
-        BigTableNextToReplace = (BigTableNextToReplace+1) % BigTableSize;
-    }
-
-    /* All done */
+    // No matching packet found, so add it to the hash table
+    struct PacketEntry *new_entry = (struct PacketEntry *) malloc(sizeof(struct PacketEntry));
+    new_entry->ThePacket = pPacket;
+    new_entry->HitCount = 0;
+    new_entry->RedundantBytes = 0;
+    new_entry->Next = &hashTable[hash % HashTableSize];
+    hashTable[hash % HashTableSize] = *new_entry;
 }
 
+// Provided function - just changed var names for HashTableSize
 void tallyProcessing ()
 {
-    for(int j=0; j<BigTableSize; j++)
+    for(int j=0; j<HashTableSize; j++)
     {
         resetAndSaveEntry(j);
     }
 }
-
-
-
-
-

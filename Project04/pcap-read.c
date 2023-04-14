@@ -187,30 +187,31 @@ struct Packet * readNextPacket (FILE * pTheFile, struct FilePcapInfo * pFileInfo
 // Wrapper used by thread to call readPcapFile
 void* readPcapFile_producer(void* args) {
 
-	// 
-
 	ThreadArgs* thread_args = (ThreadArgs*) args;
     Queue* packet_queue = thread_args->packet_queue;
 
+
+	// Read in the file	
     readPcapFile(args);
 
+	// If only one file was provided, re-run the function for testing purposes
 	if (thread_args->num_files == 1){
 	    readPcapFile(args);
 	}
 
+	// Get the lock to change flag variable
     pthread_mutex_lock(&packet_queue->lock);
 	packet_queue->KeepGoing = 0;
-	pthread_cond_broadcast(&packet_queue->empty);
 
+	// Broadcast to waiting threads
+	pthread_cond_broadcast(&packet_queue->empty);
     pthread_mutex_unlock(&packet_queue->lock);
 
     return NULL;
 }
 
-
 char readPcapFile (void* arg)
 {
-
 	ThreadArgs* thread_args = (ThreadArgs*) arg;
     struct FilePcapInfo* pFileInfo = &(thread_args->theInfo);
     Queue* packet_queue = thread_args->packet_queue;
@@ -256,7 +257,6 @@ char readPcapFile (void* arg)
 	}
 
 	fclose(pTheFile);
-
 	printf("File processing complete - %s file read containing %d packets with %d bytes of packet data\n", pFileInfo->FileName, pFileInfo->Packets, pFileInfo->BytesRead);
 	
 	packet_queue->total_packets = total;
