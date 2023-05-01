@@ -8,12 +8,52 @@ Make your changes here.
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
 
 extern struct disk *thedisk;
+bool is_mounted = false;
 
 int fs_format()
 {
-	return 0;
+    // Check if mounted
+    if (is_mounted) {
+        return 0;
+    }
+
+    union fs_block block;
+    disk_read(thedisk, 0, block.data);
+
+    // Initialize superblock
+    block.super.magic = FS_MAGIC;
+    block.super.nblocks = disk_size();
+
+    // Use 10% of blocks for inodes
+    float ten_percent = block.super.nblocks * 0.1;
+    block.super.ninodeblocks = (int) ceil(ten_percent);
+    block.super.ninodes = block.super.ninodeblocks * INODES_PER_BLOCK;
+
+    disk_write(thedisk, 0, block.data);
+
+    // Clear all blocks
+    for(int i = 1; i <= block.super.ninodeblocks; i++) {
+
+        for(int j = 0; j < INODES_PER_BLOCK; j++){
+            block.inode[j].isvalid = 0;
+            block.inode[j].size = 0;
+
+            // Clear all direct
+            for(int k = 0; k < POINTERS_PER_INODE; k++)   
+                block.inode[j].direct[k] = 0;
+    
+            // Clear all indirect
+            block.inode[j].indirect = 0;
+        }
+
+        disk_write(thedisk, i, block.data);
+    }
+
+    return 1;
 }
 
 void fs_debug()
@@ -22,8 +62,7 @@ void fs_debug()
 
 	disk_read(thedisk,0,block.data);
 
-
-	    // Check that nblocks, ninodeblocks, and ninodes are consistent
+    // Check that nblocks, ninodeblocks, and ninodes are consistent
     int expected_ninodeblocks = (block.super.ninodes + INODES_PER_BLOCK - 1) / INODES_PER_BLOCK;
 	int expected_ninodes = expected_ninodeblocks * INODES_PER_BLOCK;
 
@@ -97,13 +136,11 @@ void fs_debug()
             }
         }
     }
-
-
 }
 
 int fs_mount()
 {
-	return 0;
+    return 0;
 }
 
 int fs_create()
