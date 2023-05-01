@@ -11,33 +11,6 @@ Make your changes here.
 
 extern struct disk *thedisk;
 
-#define FS_MAGIC           0x30341003
-#define INODES_PER_BLOCK   128
-#define POINTERS_PER_INODE 3
-#define POINTERS_PER_BLOCK 1024
-
-struct fs_superblock {
-	int32_t magic;
-	int32_t nblocks;
-	int32_t ninodeblocks;
-	int32_t ninodes;
-};
-
-struct fs_inode {
-	int32_t isvalid;
-	int32_t size;
-	int64_t ctime;
-	int32_t direct[POINTERS_PER_INODE];
-	int32_t indirect;
-};
-
-union fs_block {
-	struct fs_superblock super;
-	struct fs_inode inode[INODES_PER_BLOCK];
-	int pointers[POINTERS_PER_BLOCK];
-	unsigned char data[BLOCK_SIZE];
-};
-
 int fs_format()
 {
 	return 0;
@@ -46,9 +19,11 @@ int fs_format()
 void fs_debug()
 {
 	union fs_block block;
-	disk_read(thedisk, 0, block.data);
 
-    // Check that nblocks, ninodeblocks, and ninodes are consistent
+	disk_read(thedisk,0,block.data);
+
+
+	    // Check that nblocks, ninodeblocks, and ninodes are consistent
     int expected_ninodeblocks = (block.super.ninodes + INODES_PER_BLOCK - 1) / INODES_PER_BLOCK;
 	int expected_ninodes = expected_ninodeblocks * INODES_PER_BLOCK;
 
@@ -122,8 +97,9 @@ void fs_debug()
             }
         }
     }
-}
 
+
+}
 
 int fs_mount()
 {

@@ -1,6 +1,9 @@
-/*
-Do not modify this file.
-Make all of your changes to main.c instead.
+/* disk.c : Disk emulation implementation file for Project 6
+*************************************************************
+* Do not modify this file.
+* Make all of your changes to fs.c instead.
+*************************************************************
+* Last Updated: 2023-04-23
 */
 
 #define _XOPEN_SOURCE 500L
@@ -13,10 +16,10 @@ Make all of your changes to main.c instead.
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/types.h>
 
-extern ssize_t pread (int __fd, void *__buf, size_t __nbytes, __off_t __offset);
-extern ssize_t pwrite (int __fd, const void *__buf, size_t __nbytes, __off_t __offset);
-
+extern ssize_t pread (int __fd, void *__buf, size_t __nbytes, off_t __offset);
+extern ssize_t pwrite (int __fd, const void *__buf, size_t __nbytes, off_t __offset);
 
 struct disk * disk_open( const char *diskname, int nblocks )
 {
@@ -81,3 +84,12 @@ void disk_close( struct disk *d )
 	close(d->fd);
 	free(d);
 }
+
+extern struct disk * thedisk;
+
+/* For backwards compatibility */
+int disk_size ()
+{
+	return thedisk->nblocks;
+}
+

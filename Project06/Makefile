@@ -1,14 +1,5 @@
-simplefs: shell.o fs.o disk.o
-	gcc shell.o fs.o disk.o -o simplefs
-
-shell.o: shell.c
-	gcc -Wall shell.c -c -o shell.o -g
-
-fs.o: fs.c fs.h
-	gcc -Wall fs.c -c -o fs.o -g
-
-disk.o: disk.c disk.h
-	gcc -Wall disk.c -c -o disk.o -g
+simplefs: shell.c fs.c fs.h disk.c
+	gcc fs.c shell.c disk.c -Wall -o simplefs
 
 clean:
-	rm -f simplefs disk.o fs.o shell.o
+	rm -f simplefs 

@@ -1,3 +1,11 @@
+/* shell.c : The shell implementation and main() code location 
+ *************************************************************
+ * Do not modify this file.
+ * Make all of your changes to fs.c instead.
+ *************************************************************
+ * Last Updated: 2023-04-23
+ */
+
 
 #include "fs.h"
 #include "disk.h"
@@ -10,7 +18,8 @@
 static int do_copyin( const char *filename, int inumber );
 static int do_copyout( int inumber, const char *filename );
 
-struct disk *thedisk = 0;
+/* Global variable for the disk itself */
+struct disk * thedisk = 0;
 
 int main( int argc, char *argv[] )
 {

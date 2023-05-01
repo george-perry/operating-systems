@@ -7,7 +7,8 @@ Make all of your changes to main.c instead.
 #ifndef DISK_H
 #define DISK_H
 
-#define BLOCK_SIZE 4096
+#define DISK_BLOCK_SIZE 4096
+#define BLOCK_SIZE      4096
 
 struct disk {
 	int fd;
@@ -19,7 +20,6 @@ struct disk {
 Create a new virtual disk in the file "filename", with the given number of blocks.
 Returns a pointer to a new disk object, or null on failure.
 */
-
 struct disk * disk_open( const char *filename, int blocks );
 
 /*
@@ -43,6 +43,11 @@ Return the number of blocks in the virtual disk.
 */
 
 int disk_nblocks( struct disk *d );
+
+/* 
+Return the size of the disk in blocks
+*/
+int disk_size();
 
 /*
 Close the virtual disk.
