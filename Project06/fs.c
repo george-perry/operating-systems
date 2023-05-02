@@ -9,10 +9,13 @@ Make your changes here.
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <math.h>
 
 extern struct disk *thedisk;
 bool is_mounted = false;
+int* free_block_bitmap;
+
 
 int fs_format()
 {
@@ -110,6 +113,8 @@ void fs_debug()
                 for (int k = 0; k < POINTERS_PER_INODE; k++) {
                     if (block.inode[j].direct[k]) {
                         printf(" %d", block.inode[j].direct[k]);
+
+                        // printf(" n %d %d\n", j, k);
                     }
                 }
 
@@ -140,13 +145,94 @@ void fs_debug()
 
 int fs_mount()
 {
-    return 0;
+    // Check if mounted
+    if (is_mounted) {
+        return 0;
+    }
+
+    union fs_block block;
+
+    // Read the first block of the disk to check if it contains a valid magic number
+    disk_read(thedisk, 0, block.data);
+    if (block.super.magic != FS_MAGIC) {
+        return 0;
+    }
+
+
+    // Allocate memory for the free block bitmap - add 7 to round up to nearest byte
+    free_block_bitmap = malloc((sizeof(int) * disk_size()));
+
+    for (int i = 0; i < (block.super.nblocks); i++) {
+		free_block_bitmap[i] = 0; 
+	}
+
+    // Read through all inode blocks and mark used blocks in the free block bitmap
+    for (int i = 1; i <= block.super.ninodeblocks; i++) {
+        disk_read(thedisk, i, block.data);
+
+        for (int j = 0; j < INODES_PER_BLOCK; j++) {
+            if (block.inode[j].isvalid) {
+
+                for (int k = 0; k < POINTERS_PER_INODE; k++) {
+                    if (block.inode[j].direct[k]) {
+                        free_block_bitmap[block.inode[j].direct[k]] = 1;
+                    }
+                }
+                
+                if (block.inode[j].indirect) {
+                    union fs_block indirect_block;
+                    disk_read(thedisk, block.inode[j].indirect, indirect_block.data);
+                    
+                    for (int k = 0; k < POINTERS_PER_BLOCK; k++) {
+                        if (indirect_block.pointers[k]) {
+                            free_block_bitmap[indirect_block.pointers[k]] = 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    is_mounted = true;
+    return 1;
 }
 
 int fs_create()
 {
-	return 0;
+    // Check if mounted
+    if (!is_mounted) {
+        return 0;
+    }
+
+    // Read the superblock
+    union fs_block block;
+    disk_read(thedisk, 0, block.data);
+
+    // Find an empty inode
+    for (int i = 1; i <= block.super.ninodeblocks; i++) {
+        disk_read(thedisk, i, block.data);
+
+        for (int j = 1; j <= INODES_PER_BLOCK; j++) {
+
+            // Check if empty
+            if (!block.inode[j].isvalid) {
+                // Set  to valid and 0 length
+                block.inode[j].isvalid = 1;
+                block.inode[j].size = 0;
+
+                // Write block
+                disk_write(thedisk, i, block.data);
+
+                // Return the inum
+                return ((i - 1) * INODES_PER_BLOCK) + j;
+            }
+        }
+    }
+    // If full, print error
+    printf("Error - Inode table full\n");
+    return 0;
 }
+
 
 int fs_delete( int inumber )
 {
