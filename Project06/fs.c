@@ -236,12 +236,100 @@ int fs_create()
 
 int fs_delete( int inumber )
 {
-	return 0;
+
+    // Check if mounted
+    if (!is_mounted) {
+        return 0;
+    }
+
+    union fs_block block;
+
+    // Calculate the block index and offset containing inode to delete
+    int inode_block_index = inumber / INODES_PER_BLOCK + 1;
+    int inode_offset = inumber % INODES_PER_BLOCK;
+
+    // Read the block
+    disk_read(thedisk, inode_block_index, block.data);
+
+    // Check for valid inumber
+    if (inumber < 0 || inumber > block.super.ninodes) {
+		printf("Error - invalid inumber\n");
+		return 0;
+	}
+
+    // Locate the inode to delete
+    struct fs_inode* inode_to_delete = &block.inode[inode_offset];
+
+    // If the inode is not valid, return 0 to indicate that the deletion failed
+    if (!inode_to_delete->isvalid) {
+        return 0;
+    }
+
+    // Release direct data
+    for (int i = 0; i < POINTERS_PER_INODE; i++) {
+        if (inode_to_delete->direct[i]) {
+            int block_index = inode_to_delete->direct[i];
+            free_block_bitmap[block_index] = 0;
+            inode_to_delete->direct[i] = 0;
+        }
+    }
+
+    // Release indirect data
+    if (inode_to_delete->indirect) {
+        union fs_block indirect_block;
+        disk_read(thedisk, inode_to_delete->indirect, indirect_block.data);
+
+        for (int i = 0; i < POINTERS_PER_BLOCK; i++) {
+            if (indirect_block.pointers[i]) {
+                int block_index = indirect_block.pointers[i];
+                free_block_bitmap[block_index] = 0;
+                indirect_block.pointers[i] = 0;
+            }
+        }
+
+        free_block_bitmap[inode_to_delete->indirect] = 0;
+        inode_to_delete->indirect = 0;
+    }
+
+    // Mark inode as invalid
+    inode_to_delete->isvalid = 0;
+    inode_to_delete->size = 0;
+
+    disk_write(thedisk, inode_block_index, block.data);
+
+    return 1;
 }
+
 
 int fs_getsize( int inumber )
 {
-	return 0;
+    // Check if mounted
+    if (!is_mounted) {
+        return -1;
+    }
+
+	union fs_block block;
+	disk_read(thedisk, 0, block.data);
+
+    // Check for valid inumber
+    if (inumber < 0 || inumber > block.super.ninodes) {
+		printf("Error - invalid inumber\n");
+		return 0;
+	}
+
+    // Calculate the block index and offset containing inode to check size
+    int inode_block_index = inumber / INODES_PER_BLOCK + 1;
+    int inode_offset = inumber % INODES_PER_BLOCK;
+
+	disk_read(thedisk, inode_block_index, block.data);
+
+    // Get the size if valid
+	if (block.inode[inode_offset].isvalid) {
+		return block.inode[inode_offset].size;
+	}
+
+    // Otherwise, return -1 on failure
+	return -1;
 }
 
 int fs_read( int inumber, char *data, int length, int offset )
