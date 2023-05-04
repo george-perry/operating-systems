@@ -181,6 +181,7 @@ int main( int argc, char *argv[] )
 
 static int do_copyin( const char *filename, int inumber )
 {
+
 	FILE *file;
 	int offset=0, result, actual;
 	char buffer[16384];
@@ -195,6 +196,8 @@ static int do_copyin( const char *filename, int inumber )
 		result = fread(buffer,1,sizeof(buffer),file);
 		if(result<=0) break;
 		if(result>0) {
+			printf("\n\nNEW: %d, %d, %d\n\n", inumber, result, offset);
+			// if (result == 10221) break;
 			actual = fs_write(inumber,buffer,result,offset);
 			if(actual<0) {
 				printf("ERROR: fs_write return invalid result %d\n",actual);
